@@ -32,18 +32,19 @@ func dfsNode(n *html.Node, isMatch func(*html.Node) bool) (*html.Node, error) {
     return nil, fmt.Errorf("No matching node found.")
 }
 
-
+// scrapes text chunks from each child html.TextNode 
+// and returns as a single newline delimited string
 func scrapeText(n *html.Node) (string, error) {
     if n == nil {
         return "", fmt.Errorf("*html.Node with nil value passed to function scrapeText")
     }
 
-    lines := make([]string, 0)
+    chunks := make([]string, 0)
 
     var dfsTextNodes func(n *html.Node)
     dfsTextNodes = func(n *html.Node) {
         if n.Type == html.TextNode {
-            lines = append(lines, n.Data)
+            chunks = append(chunks, n.Data)
         }
         for c := n.FirstChild; c != nil; c = c.NextSibling {
             dfsTextNodes(c)
@@ -51,13 +52,13 @@ func scrapeText(n *html.Node) (string, error) {
     }
     dfsTextNodes(n)
 
-    if len(lines) == 0 {
+    if len(chunks) == 0 {
         return "", fmt.Errorf("0 text nodes found in *html.Node passed to scrapeText func")
     }
-    return strings.Join(lines, "\n"), nil
+    return strings.Join(chunks, "\n"), nil
 }
 
-
+// scrapes sample tests from given contest and problem
 func ScrapeTests(contest, problem string) ([]Test, error) {
 
     url := fmt.Sprintf("https://codeforces.com/problemset/problem/%s/%s", contest, problem)
@@ -112,7 +113,7 @@ func ScrapeTests(contest, problem string) ([]Test, error) {
 
         // html <pre> tag containing program input
         inputPre := inputNode.LastChild
-        // html <pre> containing program ouput
+        // html <pre> tag containing program ouput
         outputPre := outputNode.LastChild
         
         // utf-8 encoded program input
