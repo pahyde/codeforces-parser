@@ -37,7 +37,7 @@ func dfsNode(n *html.Node, isMatch func(*html.Node) bool) (*html.Node, error) {
 
 
 func parseLines(n *html.Node) string {
-    //TODO: returns formated utf-8 encoded text nested in html Node 'n'
+    //TODO: returns formatted utf-8 encoded text nested in html Node 'n'
     return ""
 }
 
