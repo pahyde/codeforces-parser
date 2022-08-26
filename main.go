@@ -8,6 +8,13 @@ import (
 )
 
 
+type Test struct {
+    input  string
+    output string
+}
+
+
+
 func dfsNode(n *html.Node, isMatch func(*html.Node) bool) (*html.Node, error) {
     if isMatch(n) {
         // success. 
@@ -27,9 +34,17 @@ func dfsNode(n *html.Node, isMatch func(*html.Node) bool) (*html.Node, error) {
     return nil, fmt.Errorf("No matching node found.")
 }
 
-func parseTests(doc *html.Node) (*html.Node, error) {
 
-    isSampleTest := func(n *html.Node) bool {
+
+func parseLines(n *html.Node) string {
+    //TODO: returns formated ut8-f encoded text nested in html Node 'n'
+    return ""
+}
+
+
+func parseTests(doc *html.Node) ([]Test, error) {
+
+    isSampleTestNode := func(n *html.Node) bool {
         if n.Type != html.ElementNode { return false }
         for _, attr := range n.Attr {
             if attr.Key == "class" && attr.Val == "sample-test" {
@@ -38,27 +53,38 @@ func parseTests(doc *html.Node) (*html.Node, error) {
         }
         return false
     }
-
-    sampleTest, err := dfsNode(doc, isSampleTest)
+    sampleTest, err := dfsNode(doc, isSampleTestNode)
     if err != nil {
         return nil, err
     }
 
+    tests := make([]Test, 0)
+
     c := sampleTest.FirstChild
 
     for c != nil {
-        input  := c
-        output := c.NextSibling
-        if output == nil {
+
+        inputNode  := c
+        outputNode := c.NextSibling
+        if outputNode == nil {
             return nil, fmt.Errorf("missing sample output for input tests")
         }
+        
+        input, err := parseLines(input)
+        if err != nil {
+            return nil, err
+        }
 
-        fmt.Println(input.Attr)
-        fmt.Println(output.Attr)
+        output, err := parseLines(output)
+        if err != nil {
+            return nil, err
+        }
+
+        tests = append(tests, Test{input, output})
 
         c = output.NextSibling
     }
-    return sampleTest, nil
+    return tests, nil
 }
 
 
@@ -74,12 +100,12 @@ func main() {
         log.Fatal(err)
     }
 
-    testCases, err := parseTests(doc)
+    tests, err := parseTests(doc)
     if err != nil {
         log.Fatal(err)
     }
 
-    fmt.Println(testCases.Data)
+    fmt.Println(tests)
 }
 
 
