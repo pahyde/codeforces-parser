@@ -1,4 +1,4 @@
-module example/cf-parser
+module github.com/forces
 
 go 1.19
 
