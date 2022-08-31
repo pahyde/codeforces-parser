@@ -1,0 +1,68 @@
+0) install forces
+1) forces cd
+    - cd to training-dir
+        - not found:
+            - Default training directory not configured. Use forces config --training-dir
+
+2) forces train ---- [-]
+                
+                [1457 B, C already exist]
+                parsing test cases and loading solution files to  ~/Documents/comp-programming/1457_1
+
+                1457 A 100%
+                1457 B 100%
+                1457 C  72%
+                ...
+
+            - Programming language not configured. Use forces config --language 
+            - Solution template not configured. Use forces config --template
+
+              Generating [default] c++ solution files for 1457 A, B, C, D, F
+
+
+
+3) forces code
+    - default to vim, options for vscode and others potentially
+
+
+4) forces test
+4) forces test A
+4) forces test .
+    - run example test cases for most recently saved solution in curr training directory
+
+5) forces submit 
+5) forces submit A
+5) forces submit .
+
+
+            * maybe not **************************************************************************
+            - forces requires a designated training-dir to store problem solutions and example tests.
+            - The training-dir can be accessed by the command
+
+            -              forces cd 
+
+            - would you like to
+                > set ~/Documents/cf as the training-dir
+                  input a custom training-dir
+                  exit
+
+
+
+
+
+
+
+            ******************************************************************************************
+
+            - Default training directory not configured.
+                
+                parsing test cases and loading solution files to  ~/Documents/comp-programming/1457
+
+                1457 A 100%
+                1457 B 100%
+                1457 C  72%
+                ...
+
+                Solution template not configured. 
+                Generating default c++ solution files for 1457 A, B, C, D, F
+

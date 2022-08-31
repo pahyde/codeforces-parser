@@ -1,0 +1,80 @@
+Supported languages:
+    - c++
+    TODO:
+        - java
+        - python
+        - go
+
+
+Names:
+    - cf-cli
+    - cf-link
+    - forces
+    - homebase 
+
+
+cmds_________________________
+
+train
+test
+sumbit
+status
+abandon
+load 1136
+load 1457 A B E
+forces code 
+config --template
+config --training-director
+
+TODO: config save by default: y/n
+
+
+primary____________________________________________
+
+forces train 1136 
+forces test 
+
+forces train 1136 A
+forces test 
+
+forces test
+
+
+
+Session Context__________________________________________________________
+
+forces session  <- starts repl 
+
+forces> train 1136 A <- scrapes single problem
+
+or
+
+forces> train 1136 <- scrapes contest
+
+forces> test   <- runs example tests for last modified solution file
+forces> test A
+forces> test .
+A B C D E F 
+^
+
+A B C D E F 
+  ^
+
+forces> submit   <- submits last modified solution file
+forces> submit A
+forces> submit .
+A B C D E F 
+^
+
+A B C D E F 
+  ^
+
+forces> status
+
+        test    |  submit
+------------------------------
+A |    passed   | failed (2/15)
+B |    passed   | failed (1/15)
+C |    passed   | failed (2/15)
+D |    passed   | unsubmitted
+E | unsumbitted | unsubmitted

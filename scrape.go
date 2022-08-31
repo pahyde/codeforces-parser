@@ -95,7 +95,7 @@ func ScrapeTests(contest, problem string) ([]Test, error) {
     })
     if err != nil {
         // sample-test node not found
-        return nil, err
+        return nil, fmt.Errorf("<div class=\"sample-test\"><\\div> not found")
     }
 
     tests := make([]Test, 0)
