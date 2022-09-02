@@ -1,27 +1,11 @@
 package main
 
 import (
-    "fmt"
-    "log"
-    "os"
-//    "os/exec"
+    "github.com/pahyde/forces/cmd"
 )
 
 func main() {
-
-    contest := os.Args[1]
-    problem := os.Args[2]
-
-    tests, err := ScrapeTests(contest, problem)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    for _, test := range tests {
-        fmt.Println(test.input)
-        fmt.Println(test.output)
-    }
-
+    cmd.Execute()
 /*
     cmd := exec.Command("vim", "test.txt")
     cmd.Stdin = os.Stdin
@@ -29,5 +13,4 @@ func main() {
     err = cmd.Run()
     fmt.Println(err) 
 */
-
 }
