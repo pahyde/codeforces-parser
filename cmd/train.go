@@ -16,6 +16,7 @@ type Contest struct {
 
 type Problem struct {
     id    string
+    name  string
     tests []Test
 }
 
@@ -52,15 +53,27 @@ var trainCmd = &cobra.Command{
             contestId, 
             make([]Problem, 0, len(problemIds)),
         }
-        for _, problemId := range problemIds {
-            tests, err := parseTests(contestId, problemId)
+        for _, id := range problemIds {
+            problemUrl := fmt.Sprintf("https://codeforces.com/contest/%s/problem/%s", contestId, id)
+            html, err := getHTMLParseTree(problemUrl)
             if err != nil {
                 log.Fatal(err)
             }
-            problem := Problem{problemId, tests}
+            // get problem name
+            name, err := parseName(html)
+            if err != nil {
+                log.Fatal(err)
+            }
+            // get problem sample tests
+            tests, err := parseTests(html)
+            if err != nil {
+                log.Fatal(err)
+            }
+            problem := Problem{id, name, tests}
             contest.problems = append(contest.problems, problem)
         }
 
+        fmt.Println(contest)
         for _, test := range contest.problems[0].tests {
             fmt.Println(test.input)
             fmt.Println(test.output)
@@ -117,20 +130,51 @@ func scrapeText(n *html.Node) (string, error) {
     return strings.Join(chunks, "\n"), nil
 }
 
-// parses sample tests from given contest and problem
-func parseTests(contest, problem string) ([]Test, error) {
-
-    url := fmt.Sprintf("https://codeforces.com/problemset/problem/%s/%s", contest, problem)
+// returns root node of html parse tree for the given url
+func getHTMLParseTree(url string) (*html.Node, error) {
     resp, err := http.Get(url)
     if err != nil {
         return nil, err
     }
     defer resp.Body.Close()
+
     doc, err := html.Parse(resp.Body)
     if err != nil {
         return nil, err
     }
+    return doc, nil
+}
 
+// parses the name of a codeforces problem from an html parse tree
+// input "problem" is an html root node corresponding to a url of the form:
+// https://codeforces.com/contest/{contestId}/problem/{problemId}
+func parseName(problem *html.Node) (string, error) {
+    name, err := dfsNode(problem, func(n *html.Node) bool {
+        if n.Type != html.TextNode { 
+            return false 
+        }
+        parent := n.Parent
+        if parent == nil {
+            return false 
+        }
+        for _, attr := range parent.Attr {
+            if attr.Key == "class" && attr.Val == "title" {
+                return true
+            }
+        }
+        return false
+    })
+    if err != nil {
+        // <div class="title">{some text}</div> node not found
+        return "", fmt.Errorf("problem name not found")
+    }
+    return name.Data, nil
+}
+
+// parses the sample tests of a codeforces problem from an html parse tree
+// input: "problem" is an html root node corresponding to a url of the form:
+// https://codeforces.com/contest/{contestId}/problem/{problemId}
+func parseTests(problem *html.Node) ([]Test, error) {
     // dfs for <div class="sample-test">
     // contains input and output for each sample test
     // On success, sampleTest has html structure:
@@ -141,7 +185,7 @@ func parseTests(contest, problem string) ([]Test, error) {
     //     <div class="output">...</div>
     //     ...
     // </div>
-    sampleTest, err := dfsNode(doc, func(n *html.Node) bool {
+    sampleTest, err := dfsNode(problem, func(n *html.Node) bool {
         if n.Type != html.ElementNode { 
             return false 
         }
