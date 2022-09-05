@@ -9,24 +9,57 @@ import (
     "github.com/spf13/cobra"
 )
 
+type TestStatus uint8
+const (
+    Fail TestStatus = iota
+    Pass
+    Unsubmitted   
+)
+
+type SubmitStatus uint8
+const (
+    MemoryLimitExceeded SubmitStatus = iota
+    TimeLimitExceeded
+    RuntimeError
+    WrongAnswer
+    IdlenessLimitExceeded
+    DenialOfJudgement
+    Accepted
+    Unsubmitted   
+)
+
 type Contest struct {
     id       string
     problems []Problem
 }
 
 type Problem struct {
-    id    string
-    name  string
-    tests []Test
+    id       string
+    name     string
+    tests    []Test
+    status   SubmitStatus
 }
 
 type Test struct {
     input  string
     output string
+    status TestStatus
 }
 
 // forces train contest
 // forces train contest problem
+// 1) parse contest problems -> Contest struct
+// 2) populate ./{contestid} with a.cpp, b.cpp
+//    and ./{contestId}/tests with dirs a,b,c... contianing in0.txt, out0.txt, int1.txt, out1.txt...
+// 3) update .forces with:
+// {
+//   path: ~/phyde/Documents/cp/{contestId}
+//   problems: [
+//      {name: 'a', testStatus: 0|1|2, submitStatus: 0|1|2},...
+//   ]
+// }
+//   
+
 var trainCmd = &cobra.Command{
     Use: "train",
     Short: "",
@@ -38,7 +71,12 @@ var trainCmd = &cobra.Command{
         problemIds := args[1:]
         if len(problemIds) == 0 {
             // get all problemIds from contestId
-            ids, err := parseProblemIds(contestId)
+            contestUrl := fmt.Sprintf("https://codeforces.com/contest/%s", contestId)
+            html, err := getHTMLParseTree(contestUrl)
+            if err != nil {
+                log.fatal(err)
+            }
+            ids, err := parseProblemIds(html)
             if err != nil {
                 log.Fatal(err)
             }
@@ -53,6 +91,7 @@ var trainCmd = &cobra.Command{
             contestId, 
             make([]Problem, 0, len(problemIds)),
         }
+
         for _, id := range problemIds {
             problemUrl := fmt.Sprintf("https://codeforces.com/contest/%s/problem/%s", contestId, id)
             html, err := getHTMLParseTree(problemUrl)
@@ -143,6 +182,13 @@ func getHTMLParseTree(url string) (*html.Node, error) {
         return nil, err
     }
     return doc, nil
+}
+
+// parses problem ids from the html parse tree of a CF contest page
+// input "contest" is an html root node corresponding to a url of the form:
+// https://codeforces.com/contest/{contestId}/
+func parseProblemIds(contest *html.Node) ([]string, error) {
+
 }
 
 // parses the name of a codeforces problem from an html parse tree
@@ -236,9 +282,3 @@ func parseTests(problem *html.Node) ([]Test, error) {
     }
     return tests, nil
 }
-
-
-func parseProblemIds(contestId string) ([]string, error) {
-    return []string{}, nil
-}
-
