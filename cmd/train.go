@@ -5,6 +5,8 @@ import (
     "strings"
     "log"
     "net/http"
+    "os"
+    "path/filepath"
     "golang.org/x/net/html"
     "github.com/spf13/cobra"
 )
@@ -48,13 +50,11 @@ type Verdict struct {
     submission    SubmitVerdict
 }
 
-// Test verdict
 type TestVerdict struct {
     passed    int // num
     total     int // den
 }
 
-// Submit verdict
 type SubmitVerdict struct {
     label   SVLabel
     message string
@@ -111,7 +111,7 @@ var trainCmd = &cobra.Command{
 
         // local directory to store parsed test cases
         //TODO: if duplicate dir, update w/ modifier, i.e. 1130 A -> 1130_0 A
-        //dir := contestId
+        contestDir := contestId
 
         contest := Contest{
             contestId, 
@@ -138,11 +138,18 @@ var trainCmd = &cobra.Command{
             contest.problems = append(contest.problems, problem)
         }
 
+        // For each problem write tests to /contestId/tests/problemId[in0.txt, out0.txt, ...]
         for _, problem := range contest.problems {
-            fmt.Printf("tests problem %s: %s\n", problem.id, problem.name)
-            for _, test := range problem.tests {
-                fmt.Println(test.input)
-                fmt.Println(test.output)
+            // tests directory for problem
+            testDir := filepath.Join(contestDir, "tests", problem.id)
+            if err := os.MkdirAll(testDir, 0755); err != nil {
+                log.Fatal(err)
+            }
+            for i, test := range problem.tests {
+                inputPath  := filepath.Join(testDir, fmt.Sprintf("in%d.txt", i))
+                outputPath := filepath.Join(testDir, fmt.Sprintf("out%d.txt", i))
+                os.WriteFile(inputPath,  []byte(test.input),  0644)
+                os.WriteFile(outputPath, []byte(test.output), 0644)
             }
         }
     },
