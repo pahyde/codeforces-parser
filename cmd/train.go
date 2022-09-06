@@ -9,25 +9,8 @@ import (
     "github.com/spf13/cobra"
 )
 
-type TestStatus uint8
-const (
-    Fail TestStatus = iota
-    Pass
-    Unsubmitted   
-)
-
-type SubmitStatus uint8
-const (
-    MemoryLimitExceeded SubmitStatus = iota
-    TimeLimitExceeded
-    RuntimeError
-    WrongAnswer
-    IdlenessLimitExceeded
-    DenialOfJudgement
-    Accepted
-    Unsubmitted   
-)
-
+// Types for organizing parsed data from codeforces
+// Used to write test cases to disk and generate solution files.
 type Contest struct {
     id       string
     problems []Problem
@@ -37,14 +20,57 @@ type Problem struct {
     id       string
     name     string
     tests    []Test
-    status   SubmitStatus
 }
 
 type Test struct {
     input  string
     output string
-    status TestStatus
 }
+
+
+// Types for session data stored in ~/.forces
+// Used to store:
+//   1) path to test cases and solution files
+//   2) contest progress and solution verdicts 
+// Persists until the next call to "forces train "
+
+//TODO: start time 
+
+type Session struct {
+    path      string
+    verdicts  []Verdict
+}
+
+// Test and Submission verdicts for problem w/ id = problemId
+type Verdict struct {
+    problemId     string
+    tests         TestVerdict
+    submission    SubmitVerdict
+}
+
+// Test verdict
+type TestVerdict struct {
+    passed    int // num
+    total     int // den
+}
+
+// Submit verdict
+type SubmitVerdict struct {
+    label   SVLabel
+    message string
+}
+
+type SVLabel uint8
+const (
+    NA                      SVLabel = iota
+    MemoryLimitExceeded 
+    TimeLimitExceeded
+    RuntimeError
+    WrongAnswer
+    IdlenessLimitExceeded
+    DenialOfJudgement
+    Accepted
+)
 
 // forces train contest
 // forces train contest problem
@@ -74,7 +100,7 @@ var trainCmd = &cobra.Command{
             contestUrl := fmt.Sprintf("https://codeforces.com/contest/%s", contestId)
             html, err := getHTMLParseTree(contestUrl)
             if err != nil {
-                log.fatal(err)
+                log.Fatal(err)
             }
             ids, err := parseProblemIds(html)
             if err != nil {
@@ -112,10 +138,12 @@ var trainCmd = &cobra.Command{
             contest.problems = append(contest.problems, problem)
         }
 
-        fmt.Println(contest)
-        for _, test := range contest.problems[0].tests {
-            fmt.Println(test.input)
-            fmt.Println(test.output)
+        for _, problem := range contest.problems {
+            fmt.Printf("tests problem %s: %s\n", problem.id, problem.name)
+            for _, test := range problem.tests {
+                fmt.Println(test.input)
+                fmt.Println(test.output)
+            }
         }
     },
 }
@@ -184,11 +212,48 @@ func getHTMLParseTree(url string) (*html.Node, error) {
     return doc, nil
 }
 
+
+// returns true if html node n contains key-value pair k,v
+func containsAttr(n *html.Node, k, v string) bool {
+    for _, attr := range n.Attr {
+        if attr.Key == k && attr.Val == v {
+            return true
+        }
+    }
+    return false
+}
+
 // parses problem ids from the html parse tree of a CF contest page
 // input "contest" is an html root node corresponding to a url of the form:
 // https://codeforces.com/contest/{contestId}/
 func parseProblemIds(contest *html.Node) ([]string, error) {
+    problems, err := dfsNode(contest, func(n *html.Node) bool {
+        if n.Type != html.ElementNode {
+            return false
+        }
+        return containsAttr(n, "class", "problems")
+    })
+    if err != nil {
+        return nil, err
+    }
+    //TODO: figure out why this works but doesn't seem match inspected html 
+    tbody := problems.FirstChild.NextSibling
+    titleRow := tbody.FirstChild
+    firstRow := titleRow.NextSibling.NextSibling
 
+    ids := make([]string, 0)
+    for r := firstRow; r != nil; r = r.NextSibling {
+        aHref, err := dfsNode(r, func(n *html.Node) bool {
+            return n.Data == "a"
+        })
+        innerText, err := scrapeText(aHref)
+        if err != nil {
+            log.Fatal(err)
+        }
+        id := strings.TrimSpace(innerText)
+        ids = append(ids, id)
+    }
+    return ids, nil
 }
 
 // parses the name of a codeforces problem from an html parse tree
@@ -203,12 +268,7 @@ func parseName(problem *html.Node) (string, error) {
         if parent == nil {
             return false 
         }
-        for _, attr := range parent.Attr {
-            if attr.Key == "class" && attr.Val == "title" {
-                return true
-            }
-        }
-        return false
+        return containsAttr(parent, "class", "title")
     })
     if err != nil {
         // <div class="title">{some text}</div> node not found
@@ -235,12 +295,7 @@ func parseTests(problem *html.Node) ([]Test, error) {
         if n.Type != html.ElementNode { 
             return false 
         }
-        for _, attr := range n.Attr {
-            if attr.Key == "class" && attr.Val == "sample-test" {
-                return true
-            }
-        }
-        return false
+        return containsAttr(n, "class", "sample-test")
     })
     if err != nil {
         // sample-test node not found
@@ -270,13 +325,11 @@ func parseTests(problem *html.Node) ([]Test, error) {
         if err != nil {
             return nil, err
         }
-
         // utf-8 encoded program output
         output, err := scrapeText(outputPre)
         if err != nil {
             return nil, err
         }
-
         tests = append(tests, Test{input, output})
         c = outputNode.NextSibling
     }
