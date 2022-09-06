@@ -6,6 +6,7 @@ import (
     "log"
     "net/http"
     "os"
+    "encoding/json"
     "path/filepath"
     "golang.org/x/net/html"
     "github.com/spf13/cobra"
@@ -39,25 +40,25 @@ type Test struct {
 //TODO: start time 
 
 type Session struct {
-    path      string
-    verdicts  []Verdict
+    Path      string
+    Verdicts  []Verdict
 }
 
 // Test and Submission verdicts for problem w/ id = problemId
 type Verdict struct {
-    problemId     string
-    tests         TestVerdict
-    submission    SubmitVerdict
+    ProblemId     string
+    Tests         TestVerdict
+    Submission    SubmitVerdict
 }
 
 type TestVerdict struct {
-    passed    int // num
-    total     int // den
+    Passed    int // num
+    Total     int // den
 }
 
 type SubmitVerdict struct {
-    label   SVLabel
-    message string
+    Label   SVLabel
+    Message string
 }
 
 type SVLabel uint8
@@ -138,7 +139,7 @@ var trainCmd = &cobra.Command{
             contest.problems = append(contest.problems, problem)
         }
 
-        // For each problem write tests to /contestId/tests/problemId[in0.txt, out0.txt, ...]
+        // For each problem write tests to dir /contestId/tests/problemId/
         for _, problem := range contest.problems {
             // tests directory for problem
             testDir := filepath.Join(contestDir, "tests", problem.id)
@@ -152,6 +153,38 @@ var trainCmd = &cobra.Command{
                 os.WriteFile(outputPath, []byte(test.output), 0644)
             }
         }
+
+        // Store session data at os dependent config directory 
+        // (e.g. .config/forces for linux).
+
+        // create session struct with path set to curr working directory
+        wd, err := os.Getwd()
+        if err != nil {
+            log.Fatal(err)
+        }
+        session := Session{Path: wd}
+        // update session with initialized verdicts
+        for _, problem := range contest.problems {
+            testVerdict   := TestVerdict{Passed: 0, Total: len(problem.tests)}
+            submitVerdict := SubmitVerdict{}
+            verdict := Verdict{problem.id, testVerdict, submitVerdict}
+            session.Verdicts = append(session.Verdicts, verdict)
+        }
+
+        // JSON encode session data
+        data, err := json.Marshal(&session)
+        if err != nil {
+            log.Fatal(err)
+        }
+        // build app directory
+        configDir, err := os.UserConfigDir()
+        appDir := filepath.Join(configDir, "forces")
+        if err := os.MkdirAll(appDir, 0700); err != nil {
+            log.Fatal(err)
+        }
+        // write session data to ...appdir/session.json
+        sessionPath := filepath.Join(appDir, "session.json")
+        os.WriteFile(sessionPath, data, 0644)
     },
 }
 
