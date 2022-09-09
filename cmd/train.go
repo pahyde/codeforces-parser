@@ -6,6 +6,7 @@ import (
     "log"
     "net/http"
     "os"
+    "time"
     "encoding/json"
     "path/filepath"
     "golang.org/x/net/html"
@@ -73,8 +74,34 @@ const (
     Accepted
 )
 
+
+// Types for template data stored in ~/.config/forces/templates.json
+type tname string
+type Templates struct {
+    Starter    tname
+    List       []Template
+}
+
+type Template struct {
+    Name  tname
+    Path  string
+    Ext   string
+    Run   string
+}
+
+func (t Templates) GetStarter() (Template, bool) {
+    for _, templ := range t.List {
+        if templ.Name == t.Starter {
+            return templ, true
+        }
+    }
+    return Template{}, false
+}
+
 // forces train contest
 // forces train contest problem
+// forces train contest problem --template python
+// forces train contest problem -t python
 // 1) parse contest problems -> Contest struct
 // 2) populate ./{contestid} with a.cpp, b.cpp
 //    and ./{contestId}/tests with dirs a,b,c... contianing in0.txt, out0.txt, int1.txt, out1.txt...
@@ -91,6 +118,7 @@ var trainCmd = &cobra.Command{
     Use: "train",
     Short: "",
     Run: func(cmd *cobra.Command, args []string) {
+        //TODO: refactor with cobra arg checks? 
         if len(args) == 0 {
             fmt.Errorf("Must provide a contest id")
         }
@@ -154,9 +182,46 @@ var trainCmd = &cobra.Command{
             }
         }
 
+        // build app directory if it doesn't exist
+        //TODO: Possibly wasteful compared to using os.Stat
+        configDir, err := os.UserConfigDir()
+        appDir := filepath.Join(configDir, "forces")
+        if err := os.MkdirAll(appDir, 0700); err != nil {
+            log.Fatal(err)
+        }
+
+        // read and deserialize Templates data or create if doesn't exist
+        var templates Templates
+        p := filepath.Join(appDir, "templates.json")
+        templates, err = readTemplates(p)
+        if os.IsNotExist(err) {
+            t, err := InitTemplates(p)
+            if err != nil {
+                log.Fatal(err)
+            }
+            templates = t
+        }
+
+        // get starter template
+        t, ok := templates.GetStarter()
+        if !ok {
+            log.Fatal("couldn't find starter template in templates list")
+        }
+        for _, problem := range contest.problems {
+            // generate solution
+            s, err := generateSolution(t, contest, problem)
+            if err != nil {
+                log.Fatal(err)
+            }
+            // write solution to path p (e.g. contest/A.cpp)
+            p := filepath.Join(contestDir, fmt.Sprintf("%s%s", problem.id, t.Ext))
+            if err := os.WriteFile(p, s, 0755); err != nil {
+                log.Fatal(err)
+            }
+        }
+
         // Store session data at os dependent config directory 
         // (e.g. .config/forces for linux).
-
         // create session struct with path set to curr working directory
         wd, err := os.Getwd()
         if err != nil {
@@ -165,31 +230,95 @@ var trainCmd = &cobra.Command{
         session := Session{Path: wd}
         // update session with initialized verdicts
         for _, problem := range contest.problems {
-            testVerdict   := TestVerdict{Passed: 0, Total: len(problem.tests)}
-            submitVerdict := SubmitVerdict{}
-            verdict := Verdict{problem.id, testVerdict, submitVerdict}
-            session.Verdicts = append(session.Verdicts, verdict)
+            test     := TestVerdict{Passed: 0, Total: len(problem.tests)}
+            submit   := SubmitVerdict{}
+            combined := Verdict{problem.id, test, submit}
+            session.Verdicts = append(session.Verdicts, combined)
         }
 
         // JSON encode session data
-        data, err := json.Marshal(&session)
+        dat, err := json.Marshal(&session)
         if err != nil {
             log.Fatal(err)
         }
-        // build app directory
-        configDir, err := os.UserConfigDir()
-        appDir := filepath.Join(configDir, "forces")
-        if err := os.MkdirAll(appDir, 0700); err != nil {
-            log.Fatal(err)
-        }
+
         // write session data to ...appdir/session.json
         sessionPath := filepath.Join(appDir, "session.json")
-        os.WriteFile(sessionPath, data, 0644)
+        os.WriteFile(sessionPath, dat, 0644)
     },
 }
 
 func init() {
     rootCmd.AddCommand(trainCmd)
+}
+
+// returns deserialized Template struct read from path p (appDir/templates.cpp)
+func readTemplates(p string) (Templates, error) {
+    // read
+    dat, err := os.ReadFile(p)
+    if err != nil {
+        return Templates{}, err
+    }
+    // unmarshal
+    var templates Templates
+    if err := json.Unmarshal(dat, &templates); err != nil {
+        return Templates{}, err
+    }
+    return templates, nil
+}
+
+// returns new Templates struct after serializing to path p (appDir/templates.cpp)
+func InitTemplates(p string) (Templates, error) {
+
+    cppPath := filepath.Join(filepath.Dir(p), "default.cpp")
+    if _, err := os.Stat(cppPath); err != nil {
+        // create a new default.cpp template
+        if err := InitDefaultTemplate(cppPath); err != nil {
+            return Templates{}, err
+        }
+    }
+
+    init := Template{
+        Name: "default",
+        Path: cppPath,
+        Ext: ".cpp",
+        Run: "g++ -o sol {{path}}.cpp & ./sol",
+    }
+    t := Templates{Starter: "default", List: []Template{init}}
+
+    dat, err := json.Marshal(&t)
+    if err != nil {
+        return Templates{}, err
+    }
+    if err := os.WriteFile(p, dat, 0644); err != nil {
+        return Templates{}, err
+    }
+    return t, nil
+}
+
+
+func InitDefaultTemplate(p string) error {
+    cpp := `
+Test CPP file
+
+`
+    return os.WriteFile(p, []byte(cpp), 0644)
+}
+
+
+func generateSolution(t Template, c Contest, p Problem) ([]byte, error) {
+    // header
+    contest := c.id
+    name    := p.name
+    url     := fmt.Sprintf("https://codeforces.com/contest/%s/problem/%s", c.id, p.id)
+    date    := time.Now().String()
+    header  := fmt.Sprintf( "// contest: %s\n// problem name: %s\n// url: %s\n// date: %s\n\n", contest, name, url, date)
+    // template
+    templ, err := os.ReadFile(t.Path)
+    if err != nil {
+        return nil, err
+    }
+    return append([]byte(header), templ...), nil
 }
 
 

@@ -23,10 +23,49 @@ abandon
 load 1136
 load 1457 A B E
 forces code 
-config --template
-config --training-director
+-x---- config --template----------------------
+-x---- config --training-director--------------
 
-TODO: config save by default: y/n
+forces templates init
+forces templates list
+forces templates add <path> [--name main]
+forces templates remove [<path>]
+>
+>
+...
+forces templates choose-starter
+forces templates use [problem id]
+> main .cpp  path: ~/cp/codeforces/templates
+> tmp0 .py   path: ~/cp/codeforces/templates
+> tmp1 .cpp  path: ~/cp/codeforces/templates
+> math .java path: ~/cp/codeforces/templates
+> tmp2 .py   path: ~/cp/codeforces/templates
+...
+
+vim ~/.config/forces/templates.json
+{
+    starter: default,
+    templates: [
+         {
+             name: default,
+             path: /pahyde/.config/forces/default.cpp,
+             ext: cpp
+             run: gcc -o sol {{path}}
+         {
+             name: main,
+             path: /pahyde/Documents/cp/codeforces/templates/main.cpp,
+             ext: cpp
+             run: gcc -o sol {{path}}
+         },
+         {
+             name: t0,
+             path: /pahyde/Documents/cp/codeforces/templates/alt.cpp,
+             ext: cpp
+             run: gcc -o sol {{path}}
+         },
+    ]
+}
+
 
 
 primary____________________________________________
