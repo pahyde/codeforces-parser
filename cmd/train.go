@@ -77,7 +77,7 @@ const (
 
 // Types for template data stored in ~/.config/forces/templates.json
 type tname string
-type Templates struct {
+type TemplateRegistry struct {
     Starter    tname
     List       []Template
 }
@@ -89,7 +89,7 @@ type Template struct {
     Run   string
 }
 
-func (t Templates) GetStarter() (Template, bool) {
+func (t TemplateRegistry) GetStarter() (Template, bool) {
     for _, templ := range t.List {
         if templ.Name == t.Starter {
             return templ, true
@@ -190,30 +190,30 @@ var trainCmd = &cobra.Command{
             log.Fatal(err)
         }
 
-        // read and deserialize Templates data or create if doesn't exist
-        var templates Templates
+        // read and deserialize TemplateRegistry or create if it doesn't exist
+        var registry TemplateRegistry
         p := filepath.Join(appDir, "templates.json")
-        templates, err = readTemplates(p)
+        registry, err = readTemplateRegistry(p)
         if os.IsNotExist(err) {
-            t, err := InitTemplates(p)
+            r, err := InitTemplateRegistry(p)
             if err != nil {
                 log.Fatal(err)
             }
-            templates = t
+            registry = r
         }
 
         // get starter template
-        t, ok := templates.GetStarter()
+        t, ok := registry.GetStarter()
         if !ok {
             log.Fatal("couldn't find starter template in templates list")
         }
+        // generate solution from starter template for each problem
+        // write to path like contest/A.cpp)
         for _, problem := range contest.problems {
-            // generate solution
             s, err := generateSolution(t, contest, problem)
             if err != nil {
                 log.Fatal(err)
             }
-            // write solution to path p (e.g. contest/A.cpp)
             p := filepath.Join(contestDir, fmt.Sprintf("%s%s", problem.id, t.Ext))
             if err := os.WriteFile(p, s, 0755); err != nil {
                 log.Fatal(err)
@@ -252,29 +252,29 @@ func init() {
     rootCmd.AddCommand(trainCmd)
 }
 
-// returns deserialized Template struct read from path p (appDir/templates.cpp)
-func readTemplates(p string) (Templates, error) {
+// returns deserialized TemplateRegistry data read from path p (appDir/templates.cpp)
+func readTemplateRegistry(p string) (TemplateRegistry, error) {
     // read
     dat, err := os.ReadFile(p)
     if err != nil {
-        return Templates{}, err
+        return TemplateRegistry{}, err
     }
     // unmarshal
-    var templates Templates
-    if err := json.Unmarshal(dat, &templates); err != nil {
-        return Templates{}, err
+    var r TemplateRegistry
+    if err := json.Unmarshal(dat, &r); err != nil {
+        return TemplateRegistry{}, err
     }
-    return templates, nil
+    return r, nil
 }
 
-// returns new Templates struct after serializing to path p (appDir/templates.cpp)
-func InitTemplates(p string) (Templates, error) {
+// returns new TemplateRegistry struct after serializing to path p (appDir/templates.cpp)
+func InitTemplateRegistry(p string) (TemplateRegistry, error) {
 
     cppPath := filepath.Join(filepath.Dir(p), "default.cpp")
     if _, err := os.Stat(cppPath); err != nil {
         // create a new default.cpp template
         if err := InitDefaultTemplate(cppPath); err != nil {
-            return Templates{}, err
+            return TemplateRegistry{}, err
         }
     }
 
@@ -284,16 +284,16 @@ func InitTemplates(p string) (Templates, error) {
         Ext: ".cpp",
         Run: "g++ -o sol {{path}}.cpp & ./sol",
     }
-    t := Templates{Starter: "default", List: []Template{init}}
+    r := TemplateRegistry{Starter: "default", List: []Template{init}}
 
-    dat, err := json.Marshal(&t)
+    dat, err := json.Marshal(&r)
     if err != nil {
-        return Templates{}, err
+        return TemplateRegistry{}, err
     }
     if err := os.WriteFile(p, dat, 0644); err != nil {
-        return Templates{}, err
+        return TemplateRegistry{}, err
     }
-    return t, nil
+    return r, nil
 }
 
 
