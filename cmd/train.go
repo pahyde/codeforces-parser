@@ -42,12 +42,28 @@ type Test struct {
 
 type Session struct {
     Path      string
-    Verdicts  []Verdict
+    Problems  []ProblemState
 }
 
-// Test and Submission verdicts for problem w/ id = problemId
-type Verdict struct {
+// !ok when problem not found 
+func (s Session) getProblemById(id string) (ProblemState, bool) {
+    for _, p := range s.Problems {
+        if p.ProblemId == id {
+            return p, true
+        }
+    }
+    return ProblemState{}, false
+}
+
+//TODO
+func (s Session) getCurrentProblem(id string) (ProblemState, error) {
+    return ProblemState{}, nil
+}
+
+// active template and test/submission verdicts for problem w/ id = problemId
+type ProblemState struct {
     ProblemId     string
+    Template      tname
     Tests         TestVerdict
     Submission    SubmitVerdict
 }
@@ -228,12 +244,13 @@ var trainCmd = &cobra.Command{
             log.Fatal(err)
         }
         session := Session{Path: wd}
-        // update session with initialized verdicts
+        // update session with problem templates and initialized verdicts
         for _, problem := range contest.problems {
+            template := registry.Starter
             test     := TestVerdict{Passed: 0, Total: len(problem.tests)}
             submit   := SubmitVerdict{}
-            combined := Verdict{problem.id, test, submit}
-            session.Verdicts = append(session.Verdicts, combined)
+            state    := ProblemState{problem.id, template, test, submit}
+            session.Problems = append(session.Problems, state)
         }
 
         // JSON encode session data
@@ -268,6 +285,7 @@ func readTemplateRegistry(p string) (TemplateRegistry, error) {
 }
 
 // returns new TemplateRegistry struct after serializing to path p (appDir/templates.cpp)
+// also restores default.cpp template if doesn't exist
 func InitTemplateRegistry(p string) (TemplateRegistry, error) {
 
     cppPath := filepath.Join(filepath.Dir(p), "default.cpp")
