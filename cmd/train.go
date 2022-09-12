@@ -48,7 +48,9 @@ type Session struct {
 // !ok when problem not found 
 func (s Session) getProblemById(id string) (ProblemState, bool) {
     for _, p := range s.Problems {
-        if p.ProblemId == id {
+        // remove file extension
+        problemId := strings.Split(p.FileName, ".")[0]
+        if problemId == id {
             return p, true
         }
     }
@@ -64,15 +66,15 @@ func (s Session) getLastModifiedProblem() (ProblemState, error) {
     // find problem with the largest unix modification time
     var lastModified ProblemState
     var maxModTime int64
-    for _, pstate := range s.Problems {
-        path := filepath.Join(dir, pstate.ProblemId)
+    for _, p := range s.Problems {
+        path := filepath.Join(dir, p.FileName)
         info, err := os.Stat(path)
         if err != nil {
             return ProblemState{}, err
         }
         if t := info.ModTime().Unix(); t > maxModTime {
             maxModTime   = t
-            lastModified = pstate
+            lastModified = p
         }
     }
     return lastModified, nil
@@ -82,7 +84,7 @@ func (s Session) getLastModifiedProblem() (ProblemState, error) {
 // TODO: Template  tname -> Templ Template
 // adds redundancy but decouples Session and TemplateRegistry structs
 type ProblemState struct {
-    ProblemId     string
+    FileName      string
     Template      tname
     Tests         TestVerdict
     Submission    SubmitVerdict
@@ -266,10 +268,11 @@ var trainCmd = &cobra.Command{
         session := Session{Path: filepath.Join(wd, contestDir)}
         // update session with problem templates and initialized verdicts
         for _, problem := range contest.problems {
+            fileName := problem.id + t.Ext
             template := registry.Starter
             test     := TestVerdict{Passed: 0, Total: len(problem.tests)}
             submit   := SubmitVerdict{}
-            state    := ProblemState{problem.id, template, test, submit}
+            state    := ProblemState{fileName, template, test, submit}
             session.Problems = append(session.Problems, state)
         }
 

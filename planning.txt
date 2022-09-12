@@ -33,14 +33,15 @@ forces templates remove [<path>]
 >
 >
 ...
-forces templates choose-starter
-forces templates use [problem id]
+forces templates choose-starter               <- changes templates.json
+forces templates use [problem id]             <- changes session.json
 > main .cpp  path: ~/cp/codeforces/templates
 > tmp0 .py   path: ~/cp/codeforces/templates
 > tmp1 .cpp  path: ~/cp/codeforces/templates
 > math .java path: ~/cp/codeforces/templates
 > tmp2 .py   path: ~/cp/codeforces/templates
 ...
+
 
 vim ~/.config/forces/templates.json
 {
