@@ -55,12 +55,32 @@ func (s Session) getProblemById(id string) (ProblemState, bool) {
     return ProblemState{}, false
 }
 
-//TODO
-func (s Session) getCurrentProblem(id string) (ProblemState, error) {
-    return ProblemState{}, nil
+// returns most recently modified problem from the current session
+func (s Session) getLastModifiedProblem() (ProblemState, error) {
+    if len(s.Problems) == 0 {
+        return ProblemState{}, fmt.Errorf("Can't get current problem. No problems listed for current session.")
+    }
+    dir := s.Path
+    // find problem with the largest unix modification time
+    var lastModified ProblemState
+    var maxModTime int64
+    for _, pstate := range s.Problems {
+        path := filepath.Join(dir, pstate.ProblemId)
+        info, err := os.Stat(path)
+        if err != nil {
+            return ProblemState{}, err
+        }
+        if t := info.ModTime().Unix(); t > maxModTime {
+            maxModTime   = t
+            lastModified = pstate
+        }
+    }
+    return lastModified, nil
 }
 
 // active template and test/submission verdicts for problem w/ id = problemId
+// TODO: Template  tname -> Templ Template
+// adds redundancy but decouples Session and TemplateRegistry structs
 type ProblemState struct {
     ProblemId     string
     Template      tname
@@ -243,7 +263,7 @@ var trainCmd = &cobra.Command{
         if err != nil {
             log.Fatal(err)
         }
-        session := Session{Path: wd}
+        session := Session{Path: filepath.Join(wd, contestDir)}
         // update session with problem templates and initialized verdicts
         for _, problem := range contest.problems {
             template := registry.Starter
@@ -262,6 +282,8 @@ var trainCmd = &cobra.Command{
         // write session data to ...appdir/session.json
         sessionPath := filepath.Join(appDir, "session.json")
         os.WriteFile(sessionPath, dat, 0644)
+
+        fmt.Println(session.getLastModifiedProblem())
     },
 }
 
