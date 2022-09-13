@@ -58,7 +58,7 @@ func (s Session) getProblemById(id string) (ProblemState, bool) {
 }
 
 // returns most recently modified problem from the current session
-func (s Session) getLastModifiedProblem() (ProblemState, error) {
+func (s Session) getProblemRecent() (ProblemState, error) {
     if len(s.Problems) == 0 {
         return ProblemState{}, fmt.Errorf("Can't get current problem. No problems listed for current session.")
     }
@@ -72,6 +72,7 @@ func (s Session) getLastModifiedProblem() (ProblemState, error) {
         if err != nil {
             return ProblemState{}, err
         }
+        fmt.Println(info.ModTime().Unix())
         if t := info.ModTime().Unix(); t > maxModTime {
             maxModTime   = t
             lastModified = p
@@ -286,7 +287,8 @@ var trainCmd = &cobra.Command{
         sessionPath := filepath.Join(appDir, "session.json")
         os.WriteFile(sessionPath, dat, 0644)
 
-        fmt.Println(session.getLastModifiedProblem())
+        fmt.Println(session.getProblemRecent())
+        fmt.Println(session.getProblemById("B"))
     },
 }
 
@@ -296,17 +298,26 @@ func init() {
 
 // returns deserialized TemplateRegistry data read from path p (appDir/templates.cpp)
 func readTemplateRegistry(p string) (TemplateRegistry, error) {
-    // read
-    dat, err := os.ReadFile(p)
-    if err != nil {
-        return TemplateRegistry{}, err
-    }
-    // unmarshal
     var r TemplateRegistry
-    if err := json.Unmarshal(dat, &r); err != nil {
+    if err := readJSON(p, &r); err != nil {
         return TemplateRegistry{}, err
     }
     return r, nil
+}
+
+// read and unmarshal json at path to value pointed to by v
+// returns InvalidUnmarshalError if v is nil or not a pointer
+func readJSON(path string, v any) error {
+    // read
+    b, err := os.ReadFile(path)
+    if err != nil {
+        return err
+    }
+    // unmarshal
+    if err := json.Unmarshal(b, v); err != nil {
+        return err
+    }
+    return nil
 }
 
 // returns new TemplateRegistry struct after serializing to path p (appDir/templates.cpp)
